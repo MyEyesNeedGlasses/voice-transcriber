@@ -1,0 +1,128 @@
+:root {
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --text: #1c1e21;
+  --muted: #65676b;
+  --border: #e3e5e8;
+  --primary: #2563eb;
+  --primary-text: #ffffff;
+  --record: #dc2626;
+  --error: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121316;
+    --card: #1c1d21;
+    --text: #e8e9eb;
+    --muted: #9a9ca1;
+    --border: #2d2f34;
+    --primary: #3b82f6;
+    --record: #ef4444;
+    --error: #f87171;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+h1 { margin: 0 0 4px; font-size: 1.75rem; }
+h2 { margin: 0 0 12px; font-size: 1.1rem; }
+header { margin-bottom: 24px; }
+
+.muted { color: var(--muted); margin: 0; }
+.small { font-size: 0.875rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recorder {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  color: var(--muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font: inherit;
+  cursor: pointer;
+  background: var(--card);
+  color: var(--text);
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-small { padding: 4px 10px; font-size: 0.875rem; }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.btn-ghost:hover { border-color: var(--muted); }
+
+.btn-record .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--record);
+}
+
+.btn-record.recording { border-color: var(--record); color: var(--record); }
+.btn-record.recording .dot { animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  50% { opacity: 0.3; }
+}
+
+audio { width: 100%; margin-bottom: 16px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.status { min-height: 1.5em; margin: 12px 0 0; color: var(--muted); }
+.status.error { color: var(--error); }
+
+.transcript { white-space: pre-wrap; margin: 8px 0 0; }
+
+.history { list-style: none; margin: 0; padding: 0; }
+
+.history li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.history li:first-child { border-top: 0; }
+.history .text { margin: 0; overflow-wrap: anywhere; }
