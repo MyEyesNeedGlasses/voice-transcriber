@@ -42,7 +42,7 @@ def main():
     print("=" * 60)
 
     if args.diarize:
-        for line in format_speaker_turns(result["raw"]):
+        for line in format_speaker_turns(result["segments"]):
             print(line)
     else:
         for seg in result["segments"]:

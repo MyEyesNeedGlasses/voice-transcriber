@@ -48,6 +48,8 @@ class Transcriber:
             compute_type=compute_type
         )
 
+        # Alignment models are per-language; loaded on first use and cached
+        self._align_models = {}
         self.diarize_model = None
 
         if diarize:
@@ -60,10 +62,39 @@ class Transcriber:
             from whisperx.diarize import DiarizationPipeline
 
             print("Loading speaker diarization model...")
-            self.diarize_model = DiarizationPipeline(
-                token=hf_token.strip(),
-                device=device
-            )
+            token = hf_token.strip()
+            try:
+                self.diarize_model = DiarizationPipeline(token=token, device=device)
+            except TypeError:
+                # Older whisperx releases name this argument use_auth_token
+                self.diarize_model = DiarizationPipeline(use_auth_token=token, device=device)
+
+    def _align(self, result, audio):
+        """Add word-level timestamps, which speaker assignment needs."""
+        language = result.get("language")
+        if language not in self._align_models:
+            try:
+                self._align_models[language] = whisperx.load_align_model(
+                    language_code=language, device=self.device
+                )
+            except Exception as exc:
+                print(f"No alignment model for language {language!r}: {exc}")
+                self._align_models[language] = None
+
+        if self._align_models[language] is None:
+            return result
+
+        model, metadata = self._align_models[language]
+        aligned = whisperx.align(
+            result["segments"],
+            model,
+            metadata,
+            audio,
+            self.device,
+            return_char_alignments=False,
+        )
+        aligned["language"] = language
+        return aligned
 
     def transcribe(self, audio_path, min_speakers=None, max_speakers=None):
 
@@ -71,8 +102,10 @@ class Transcriber:
         duration = len(audio) / SAMPLE_RATE
 
         result = self.model.transcribe(audio)
+        diarized = False
 
-        if self.diarize_model is not None:
+        if self.diarize_model is not None and result["segments"]:
+            result = self._align(result, audio)
             diarize_segments = self.diarize_model(
                 audio,
                 min_speakers=min_speakers,
@@ -82,16 +115,20 @@ class Transcriber:
                 diarize_segments,
                 result
             )
+            diarized = True
 
-        segments = [
-            {
-                "start": round(seg["start"], 2),
-                "end": round(seg["end"], 2),
-                "text": seg["text"].strip(),
-                "speaker": seg.get("speaker"),
-            }
-            for seg in result["segments"]
-        ]
+        if diarized:
+            segments = speaker_turns(result)
+        else:
+            segments = [
+                {
+                    "start": round(seg["start"], 2),
+                    "end": round(seg["end"], 2),
+                    "text": seg["text"].strip(),
+                    "speaker": None,
+                }
+                for seg in result["segments"]
+            ]
 
         return {
             "language": result.get("language"),
@@ -102,34 +139,56 @@ class Transcriber:
         }
 
 
-def format_speaker_turns(result):
-    """Group consecutive words by speaker into "SPEAKER: text" lines."""
+def speaker_turns(result):
+    """Merge consecutive words by the same speaker into one segment.
 
-    lines = []
-    current_speaker = None
-    current_text = []
+    WhisperX segments can span a speaker change, so turns are rebuilt from
+    word-level speaker labels. Words without a label (e.g. numbers that could
+    not be aligned) stay with the current speaker. Segments without word data
+    fall back to their segment-level speaker.
+    """
+    turns = []
+
+    def add(speaker, text, start, end):
+        if turns and turns[-1]["speaker"] == speaker:
+            turn = turns[-1]
+            turn["text"] = f"{turn['text']} {text}"
+            if start is not None and turn["start"] is None:
+                turn["start"] = start
+            if end is not None:
+                turn["end"] = end
+        else:
+            turns.append({"speaker": speaker, "text": text, "start": start, "end": end})
 
     for segment in result["segments"]:
+        words = segment.get("words") or []
+        if not words:
+            text = segment.get("text", "").strip()
+            if text:
+                add(segment.get("speaker"), text, segment.get("start"), segment.get("end"))
+            continue
 
-        for word in segment.get("words", []):
-
-            speaker = word.get("speaker", "UNKNOWN")
+        for word in words:
             text = word.get("word", "").strip()
-
             if not text:
                 continue
+            speaker = word.get("speaker")
+            if speaker is None:
+                speaker = turns[-1]["speaker"] if turns else segment.get("speaker")
+            add(speaker, text, word.get("start"), word.get("end"))
 
-            if current_speaker is None:
-                current_speaker = speaker
+    # Fill any missing timestamps from neighbours so the schema stays valid
+    for i, turn in enumerate(turns):
+        if turn["start"] is None:
+            turn["start"] = turns[i - 1]["end"] if i else 0.0
+        if turn["end"] is None:
+            turn["end"] = turn["start"]
+        turn["start"] = round(turn["start"], 2)
+        turn["end"] = round(turn["end"], 2)
 
-            if speaker != current_speaker:
-                lines.append(f"{current_speaker}: {' '.join(current_text)}")
-                current_speaker = speaker
-                current_text = []
+    return turns
 
-            current_text.append(text)
 
-    if current_text:
-        lines.append(f"{current_speaker}: {' '.join(current_text)}")
-
-    return lines
+def format_speaker_turns(segments):
+    """Render segments as "SPEAKER: text" lines."""
+    return [f"{seg['speaker'] or 'UNKNOWN'}: {seg['text']}" for seg in segments]

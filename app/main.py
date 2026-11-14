@@ -4,7 +4,7 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,13 +52,27 @@ async def health():
     return Health(status="ok", model=settings.model_name, diarization=settings.diarize)
 
 
-def _run_transcription(transcriber, path):
+def _run_transcription(transcriber, path, min_speakers=None, max_speakers=None):
     with _model_lock:
-        return transcriber.transcribe(path)
+        return transcriber.transcribe(
+            path, min_speakers=min_speakers, max_speakers=max_speakers
+        )
 
 
 @app.post("/api/transcribe", response_model=Transcription, status_code=201)
-async def transcribe(request: Request, file: UploadFile = File(...)):
+async def transcribe(
+    request: Request,
+    file: UploadFile = File(...),
+    num_speakers: int | None = Form(None, ge=1, le=20),
+    min_speakers: int | None = Form(None, ge=1, le=20),
+    max_speakers: int | None = Form(None, ge=1, le=20),
+):
+    # num_speakers is shorthand for an exact count
+    if num_speakers is not None:
+        min_speakers = max_speakers = num_speakers
+    if min_speakers and max_speakers and min_speakers > max_speakers:
+        raise HTTPException(400, "min_speakers cannot be greater than max_speakers")
+
     content_type = (file.content_type or "").lower()
     if not content_type.startswith(ALLOWED_CONTENT_TYPES):
         raise HTTPException(400, f"Unsupported file type: {content_type or 'unknown'}")
@@ -81,7 +95,11 @@ async def transcribe(request: Request, file: UploadFile = File(...)):
 
         try:
             result = await run_in_threadpool(
-                _run_transcription, request.app.state.transcriber, tmp.name
+                _run_transcription,
+                request.app.state.transcriber,
+                tmp.name,
+                min_speakers,
+                max_speakers,
             )
         except Exception as exc:
             raise HTTPException(500, f"Transcription failed: {exc}") from exc

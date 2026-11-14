@@ -1,0 +1,19 @@
+services:
+  transcriber:
+    build: .
+    image: voice-transcriber
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_PATH: /app/data/transcriptions.db
+    volumes:
+      - ./data:/app/data
+      - model-cache:/cache
+      - ./samples:/app/samples:ro
+    restart: unless-stopped
+
+volumes:
+  model-cache:

@@ -8,6 +8,9 @@ const statusEl = document.getElementById("status");
 const resultCard = document.getElementById("result-card");
 const resultMeta = document.getElementById("result-meta");
 const resultText = document.getElementById("result-text");
+const resultTurns = document.getElementById("result-turns");
+const speakersField = document.getElementById("speakers-field");
+const speakersInput = document.getElementById("speakers-input");
 const copyBtn = document.getElementById("copy-btn");
 const historyEl = document.getElementById("history");
 const historyEmpty = document.getElementById("history-empty");
@@ -121,6 +124,9 @@ transcribeBtn.addEventListener("click", async () => {
 
   const form = new FormData();
   form.append("file", audioBlob, audioName);
+  if (!speakersField.hidden && speakersInput.value) {
+    form.append("num_speakers", speakersInput.value);
+  }
 
   transcribeBtn.disabled = true;
   recordBtn.disabled = true;
@@ -146,18 +152,76 @@ function describe(item) {
   const parts = [new Date(item.created_at).toLocaleString()];
   if (item.duration != null) parts.push(formatSeconds(item.duration));
   if (item.language) parts.push(item.language.toUpperCase());
+  const speakers = new Set(item.segments.map((seg) => seg.speaker).filter(Boolean));
+  if (speakers.size) parts.push(`${speakers.size} speaker${speakers.size === 1 ? "" : "s"}`);
   return parts.join(" · ");
 }
 
+function hasSpeakers(item) {
+  return item.segments.some((seg) => seg.speaker);
+}
+
+// "SPEAKER_00" -> "Speaker 1"
+function speakerName(label) {
+  const match = /^SPEAKER_(\d+)$/.exec(label || "");
+  if (match) return `Speaker ${Number(match[1]) + 1}`;
+  return label || "Unknown";
+}
+
+function speakerColor(label) {
+  const match = /(\d+)$/.exec(label || "");
+  return match ? Number(match[1]) % 6 : 0;
+}
+
+function transcriptText(item) {
+  if (!hasSpeakers(item)) return item.text;
+  return item.segments.map((seg) => `${speakerName(seg.speaker)}: ${seg.text}`).join("\n");
+}
+
+let currentItem = null;
+
 function showResult(item) {
+  currentItem = item;
   resultCard.hidden = false;
   resultMeta.textContent = describe(item);
-  resultText.textContent = item.text || "(no speech detected)";
+
+  const diarized = hasSpeakers(item);
+  resultText.hidden = diarized;
+  resultTurns.hidden = !diarized;
+  resultTurns.replaceChildren();
+
+  if (!diarized) {
+    resultText.textContent = item.text || "(no speech detected)";
+    return;
+  }
+
+  for (const seg of item.segments) {
+    const who = document.createElement("span");
+    who.className = `speaker speaker-${speakerColor(seg.speaker)}`;
+    who.textContent = speakerName(seg.speaker);
+
+    const when = document.createElement("span");
+    when.className = "muted small";
+    when.textContent = formatSeconds(seg.start);
+
+    const head = document.createElement("div");
+    head.className = "turn-head";
+    head.append(who, when);
+
+    const text = document.createElement("p");
+    text.textContent = seg.text;
+
+    const row = document.createElement("div");
+    row.className = "turn";
+    row.append(head, text);
+    resultTurns.append(row);
+  }
 }
 
 copyBtn.addEventListener("click", async () => {
+  if (!currentItem) return;
   try {
-    await navigator.clipboard.writeText(resultText.textContent);
+    await navigator.clipboard.writeText(transcriptText(currentItem));
     copyBtn.textContent = "Copied";
     setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
   } catch {
@@ -208,4 +272,15 @@ function renderHistory(items) {
   }
 }
 
+async function loadHealth() {
+  try {
+    const res = await fetch("/api/health");
+    const health = await res.json();
+    speakersField.hidden = !health.diarization;
+  } catch {
+    // Health is only used to show the speakers field
+  }
+}
+
+loadHealth();
 loadHistory();
