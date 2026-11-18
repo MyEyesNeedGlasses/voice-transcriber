@@ -82,6 +82,19 @@ Notes:
   another device using an IP address, recording is blocked, but file upload still works.
 - **Hardware:** the default Docker setup runs on CPU. Change `WHISPER_MODEL` in `.env` to trade speed for accuracy.
 
+### CPU-only setup
+
+If your PC doesn't have a compatible NVIDIA GPU, run the standard Docker setup:
+
+```powershell
+docker compose up -d --build
+```
+
+Open `http://localhost:8000` once the app starts. Speaker diarization also works on CPU
+when enabled in `.env` with a valid Hugging Face token. Long recordings can take a while.
+Set `WHISPER_MODEL=base` in `.env` if you prefer faster speech recognition and can accept
+some loss in accuracy.
+
 ### Optional NVIDIA GPU acceleration
 
 On Windows, use Docker Desktop with the WSL 2 backend and a compatible NVIDIA driver.
