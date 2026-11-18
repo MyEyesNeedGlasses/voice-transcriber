@@ -17,7 +17,9 @@ WORKDIR /app
 
 # CPU-only PyTorch first, so whisperx doesn't pull the multi-GB CUDA build
 RUN pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.8.0 torchaudio==2.8.0
+        torch==2.8.0 \
+        torchaudio==2.8.0 \
+        torchvision==0.23.0
 
 COPY requirements.txt .
 # triton (~1 GB) is a GPU-only compiler that whisperx lists but never imports

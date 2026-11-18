@@ -9,6 +9,9 @@ services:
         required: false
     environment:
       DB_PATH: /app/data/transcriptions.db
+      MAX_UPLOAD_MB: "500"
+      HF_TOKEN: 
+      ENABLE_DIARIZATION: "true"
     volumes:
       - ./data:/app/data
       - model-cache:/cache
