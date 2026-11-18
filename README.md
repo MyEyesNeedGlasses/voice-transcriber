@@ -15,7 +15,7 @@ Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and st
 ### 2. Get the code
 
 ```bash
-git clone https://github.com/VinayAnupNair/voice-transcriber.git
+git clone https://github.com/MyEyesNeedGlasses/voice-transcriber.git
 cd voice-transcriber
 ```
 
@@ -80,8 +80,19 @@ Notes:
   passed to the container when it starts.
 - **Microphone:** browsers only allow recording on `localhost` or HTTPS. If you open the app from
   another device using an IP address, recording is blocked, but file upload still works.
-- **Hardware:** the image runs on CPU only. Transcription is slower than with a GPU, and the `small` model
-  is a good balance. Change `WHISPER_MODEL` in `.env` to trade speed for accuracy.
+- **Hardware:** the default Docker setup runs on CPU. Change `WHISPER_MODEL` in `.env` to trade speed for accuracy.
+
+### Optional NVIDIA GPU acceleration
+
+On Windows, use Docker Desktop with the WSL 2 backend and a compatible NVIDIA driver.
+Start the CUDA build with the Compose override:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+The GPU setup uses the same `.env`, transcript history, and model cache as the default setup.
+Wait for any active transcription to finish before switching containers.
 
 ## Project layout
 
