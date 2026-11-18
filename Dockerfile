@@ -15,16 +15,17 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# CPU-only PyTorch first, so whisperx doesn't pull the multi-GB CUDA build
-RUN pip install --index-url https://download.pytorch.org/whl/cpu \
+# Use the CPU wheels by default. The GPU Compose override selects CUDA wheels.
+ARG PYTORCH_VARIANT=cpu
+RUN pip install --index-url https://download.pytorch.org/whl/${PYTORCH_VARIANT} \
         torch==2.8.0 \
         torchaudio==2.8.0 \
         torchvision==0.23.0
 
 COPY requirements.txt .
-# triton (~1 GB) is a GPU-only compiler that whisperx lists but never imports
+# Keep Triton available in CUDA builds.
 RUN pip install -r requirements.txt whisperx==3.8.6 \
-    && pip uninstall -y triton
+    && if [ "$PYTORCH_VARIANT" = cpu ]; then pip uninstall -y triton; fi
 
 COPY app ./app
 COPY scripts ./scripts

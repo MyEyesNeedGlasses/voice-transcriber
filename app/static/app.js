@@ -130,7 +130,7 @@ transcribeBtn.addEventListener("click", async () => {
 
   transcribeBtn.disabled = true;
   recordBtn.disabled = true;
-  setStatus("Transcribing… this can take a while on CPU.");
+  setStatus("Transcribing… running on GPU.");
 
   try {
     const res = await fetch("/api/transcribe", { method: "POST", body: form });

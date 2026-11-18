@@ -1,0 +1,18 @@
+services:
+  transcriber:
+    image: voice-transcriber:cuda
+    build:
+      args:
+        PYTORCH_VARIANT: cu128
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      WHISPER_DEVICE: cuda
+      WHISPER_COMPUTE_TYPE: int8
+      # CTranslate2 needs to find the CUDA libraries installed with PyTorch.
+      LD_LIBRARY_PATH: /usr/local/lib/python3.12/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
