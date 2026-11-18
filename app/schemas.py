@@ -22,3 +22,4 @@ class Health(BaseModel):
     status: str
     model: str
     diarization: bool
+    device: str

@@ -21,6 +21,7 @@ let audioBlob = null;
 let audioName = null;
 let timerId = null;
 let startedAt = 0;
+let transcriptionDevice = "";
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -130,7 +131,8 @@ transcribeBtn.addEventListener("click", async () => {
 
   transcribeBtn.disabled = true;
   recordBtn.disabled = true;
-  setStatus("Transcribing… running on GPU.");
+  const deviceLabel = transcriptionDevice ? ` Running on ${transcriptionDevice}.` : "";
+  setStatus(`Transcribing…${deviceLabel}`);
 
   try {
     const res = await fetch("/api/transcribe", { method: "POST", body: form });
@@ -277,6 +279,9 @@ async function loadHealth() {
     const res = await fetch("/api/health");
     const health = await res.json();
     speakersField.hidden = !health.diarization;
+    if (health.device) {
+      transcriptionDevice = health.device.startsWith("cuda") ? "GPU" : health.device.toUpperCase();
+    }
   } catch {
     // Health is only used to show the speakers field
   }

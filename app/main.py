@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI):
         compute_type=settings.compute_type,
         diarize=settings.diarize,
         hf_token=settings.hf_token,
+        batch_size=settings.batch_size,
     )
     yield
 
@@ -49,7 +50,7 @@ async def index(request: Request):
 
 @app.get("/api/health", response_model=Health)
 async def health():
-    return Health(status="ok", model=settings.model_name, diarization=settings.diarize)
+    return Health(status="ok", model=settings.model_name, diarization=settings.diarize, device=settings.device)
 
 
 def _run_transcription(transcriber, path, min_speakers=None, max_speakers=None):

@@ -107,6 +107,11 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 The GPU setup uses the same `.env`, transcript history, and model cache as the default setup.
 Wait for any active transcription to finish before switching containers.
 
+Speech recognition batches two audio segments on CPU and four on GPU. Set
+`WHISPER_BATCH_SIZE` in `.env` to override either default. Use `1` if memory is tight.
+`docker compose logs -f transcriber` reports how long decoding, speech recognition,
+word alignment, and speaker diarization take.
+
 ## Project layout
 
 ```

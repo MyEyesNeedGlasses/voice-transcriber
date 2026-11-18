@@ -29,6 +29,7 @@ def main():
         compute_type=settings.compute_type,
         diarize=args.diarize,
         hf_token=settings.hf_token,
+        batch_size=settings.batch_size,
     )
 
     result = transcriber.transcribe(

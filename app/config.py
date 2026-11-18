@@ -20,6 +20,9 @@ class Settings:
     model_name: str = field(default_factory=lambda: os.getenv("WHISPER_MODEL", "small"))
     device: str = field(default_factory=lambda: os.getenv("WHISPER_DEVICE", "cpu"))
     compute_type: str = field(default_factory=lambda: os.getenv("WHISPER_COMPUTE_TYPE", "int8"))
+    batch_size: int | None = field(
+        default_factory=lambda: int(os.environ["WHISPER_BATCH_SIZE"]) if os.getenv("WHISPER_BATCH_SIZE") else None
+    )
     diarize: bool = field(default_factory=lambda: _bool(os.getenv("ENABLE_DIARIZATION")))
     hf_token: str | None = field(default_factory=lambda: os.getenv("HF_TOKEN"))
     db_path: Path = field(

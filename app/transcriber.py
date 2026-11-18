@@ -1,8 +1,12 @@
+import logging
+from time import perf_counter
+
 import av
 import numpy as np
 import whisperx
 
 SAMPLE_RATE = 16000
+logger = logging.getLogger("uvicorn.error")
 
 
 def load_audio(path):
@@ -25,7 +29,9 @@ def load_audio(path):
     if not chunks:
         raise ValueError("No audio found in file")
 
-    return np.concatenate(chunks).astype(np.float32) / 32768.0
+    audio = np.concatenate(chunks, dtype=np.float32)
+    audio /= 32768.0
+    return audio
 
 
 class Transcriber:
@@ -37,9 +43,14 @@ class Transcriber:
         compute_type="int8",
         diarize=False,
         hf_token=None,
+        batch_size=None,
     ):
         self.device = device
         self.diarize = diarize
+        if batch_size is not None and batch_size < 1:
+            raise ValueError("WHISPER_BATCH_SIZE must be at least 1")
+        default_batch_size = 4 if device.startswith("cuda") else 2
+        self.batch_size = default_batch_size if batch_size is None else batch_size
 
         print(f"Loading WhisperX model ({model_name})...")
         self.model = whisperx.load_model(
@@ -97,15 +108,25 @@ class Transcriber:
         return aligned
 
     def transcribe(self, audio_path, min_speakers=None, max_speakers=None):
-
+        started = perf_counter()
         audio = load_audio(audio_path)
         duration = len(audio) / SAMPLE_RATE
 
-        result = self.model.transcribe(audio)
+        logger.info(
+            "Decoded %.1fs of audio in %.1fs. Running speech recognition on %s with batch size %d.",
+            duration, perf_counter() - started, self.device, self.batch_size,
+        )
+        started = perf_counter()
+        result = self.model.transcribe(audio, batch_size=self.batch_size)
+        logger.info("Speech recognition finished in %.1fs.", perf_counter() - started)
         diarized = False
 
         if self.diarize_model is not None and result["segments"]:
+            started = perf_counter()
             result = self._align(result, audio)
+            logger.info("Word alignment finished in %.1fs. Running speaker diarization.",
+                        perf_counter() - started)
+            started = perf_counter()
             diarize_segments = self.diarize_model(
                 audio,
                 min_speakers=min_speakers,
@@ -115,6 +136,7 @@ class Transcriber:
                 diarize_segments,
                 result
             )
+            logger.info("Speaker diarization and assignment finished in %.1fs.", perf_counter() - started)
             diarized = True
 
         if diarized:
@@ -152,13 +174,13 @@ def speaker_turns(result):
     def add(speaker, text, start, end):
         if turns and turns[-1]["speaker"] == speaker:
             turn = turns[-1]
-            turn["text"] = f"{turn['text']} {text}"
+            turn["text"].append(text)
             if start is not None and turn["start"] is None:
                 turn["start"] = start
             if end is not None:
                 turn["end"] = end
         else:
-            turns.append({"speaker": speaker, "text": text, "start": start, "end": end})
+            turns.append({"speaker": speaker, "text": [text], "start": start, "end": end})
 
     for segment in result["segments"]:
         words = segment.get("words") or []
@@ -179,6 +201,7 @@ def speaker_turns(result):
 
     # Fill any missing timestamps from neighbours so the schema stays valid
     for i, turn in enumerate(turns):
+        turn["text"] = " ".join(turn["text"])
         if turn["start"] is None:
             turn["start"] = turns[i - 1]["end"] if i else 0.0
         if turn["end"] is None:
