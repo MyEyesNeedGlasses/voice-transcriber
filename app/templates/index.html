@@ -10,10 +10,11 @@
   <main>
     <header>
       <h1>Voice Transcriber</h1>
-      <p class="muted">Record your voice, then transcribe it with WhisperX.</p>
+      <p class="muted">Turn recordings into searchable transcripts.</p>
     </header>
 
-    <section class="card">
+    <section class="card capture" aria-labelledby="capture-title">
+      <h2 id="capture-title">New transcription</h2>
       <div class="recorder">
         <button id="record-btn" class="btn btn-record" type="button">
           <span class="dot"></span><span id="record-label">Start recording</span>
@@ -24,11 +25,12 @@
       <audio id="preview" controls hidden></audio>
 
       <div class="actions">
-        <button id="transcribe-btn" class="btn btn-primary" type="button" disabled>Transcribe</button>
-        <label class="btn btn-ghost">
-          Upload a file
-          <input id="file-input" type="file" accept="audio/*,video/webm" hidden>
+        <label id="drop-zone" class="drop-zone">
+          <strong>Choose a file</strong>
+          <span class="muted small">or drop it here</span>
+          <input id="file-input" class="visually-hidden" type="file" accept="audio/*,video/webm,video/mp4,video/ogg">
         </label>
+        <button id="transcribe-btn" class="btn btn-primary" type="button" disabled>Transcribe</button>
         <label id="speakers-field" class="field" hidden>
           Speakers
           <input id="speakers-input" type="number" min="1" max="20" placeholder="auto">
@@ -48,8 +50,11 @@
       <div id="result-turns" class="turns" hidden></div>
     </section>
 
-    <section class="card">
-      <h2>History</h2>
+    <section class="card history-card">
+      <div class="card-head">
+        <h2>History</h2>
+        <input id="history-search" type="search" placeholder="Search transcripts" aria-label="Search transcripts" hidden>
+      </div>
       <ul id="history" class="history"></ul>
       <p id="history-empty" class="muted small">No transcriptions yet.</p>
     </section>

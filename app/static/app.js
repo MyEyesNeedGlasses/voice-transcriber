@@ -4,6 +4,7 @@ const timerEl = document.getElementById("timer");
 const preview = document.getElementById("preview");
 const transcribeBtn = document.getElementById("transcribe-btn");
 const fileInput = document.getElementById("file-input");
+const dropZone = document.getElementById("drop-zone");
 const statusEl = document.getElementById("status");
 const resultCard = document.getElementById("result-card");
 const resultMeta = document.getElementById("result-meta");
@@ -14,6 +15,7 @@ const speakersInput = document.getElementById("speakers-input");
 const copyBtn = document.getElementById("copy-btn");
 const historyEl = document.getElementById("history");
 const historyEmpty = document.getElementById("history-empty");
+const historySearch = document.getElementById("history-search");
 
 let mediaRecorder = null;
 let chunks = [];
@@ -22,6 +24,7 @@ let audioName = null;
 let timerId = null;
 let startedAt = 0;
 let transcriptionDevice = "";
+let historyItems = [];
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -81,10 +84,12 @@ async function startRecording() {
     const type = mediaRecorder.mimeType || "audio/webm";
     const blob = new Blob(chunks, { type });
     setAudio(blob, `recording-${Date.now()}.${extensionFor(type)}`);
+    fileInput.disabled = false;
     setStatus("Recording ready. Click Transcribe.");
   };
 
   mediaRecorder.start();
+  fileInput.disabled = true;
   startedAt = Date.now();
   timerEl.textContent = "00:00";
   timerId = setInterval(() => {
@@ -112,12 +117,26 @@ recordBtn.addEventListener("click", () => {
   }
 });
 
-fileInput.addEventListener("change", () => {
-  const file = fileInput.files[0];
-  if (!file) return;
+function selectFile(file) {
+  if (!file || fileInput.disabled) return;
   setAudio(file, file.name);
   setStatus(`Loaded ${file.name}. Click Transcribe.`);
+}
+
+fileInput.addEventListener("change", () => {
+  selectFile(fileInput.files[0]);
   fileInput.value = "";
+});
+
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  if (!fileInput.disabled) dropZone.classList.add("dragging");
+});
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragging"));
+dropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("dragging");
+  selectFile(event.dataTransfer.files[0]);
 });
 
 transcribeBtn.addEventListener("click", async () => {
@@ -131,6 +150,7 @@ transcribeBtn.addEventListener("click", async () => {
 
   transcribeBtn.disabled = true;
   recordBtn.disabled = true;
+  fileInput.disabled = true;
   const deviceLabel = transcriptionDevice ? ` Running on ${transcriptionDevice}.` : "";
   setStatus(`Transcribing…${deviceLabel}`);
 
@@ -147,6 +167,7 @@ transcribeBtn.addEventListener("click", async () => {
   } finally {
     transcribeBtn.disabled = false;
     recordBtn.disabled = false;
+    fileInput.disabled = false;
   }
 });
 
@@ -234,30 +255,43 @@ copyBtn.addEventListener("click", async () => {
 async function loadHistory() {
   try {
     const res = await fetch("/api/transcriptions");
-    const items = await res.json();
-    renderHistory(items);
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    historyItems = await res.json();
+    historySearch.hidden = !historyItems.length;
+    renderHistory();
   } catch (err) {
     setStatus(`Could not load history: ${err.message}`, true);
   }
 }
 
-function renderHistory(items) {
+historySearch.addEventListener("input", renderHistory);
+
+function renderHistory() {
+  const query = historySearch.value.trim().toLowerCase();
+  const items = historyItems.filter((item) =>
+    [item.filename, item.text].some((value) => value?.toLowerCase().includes(query))
+  );
   historyEl.replaceChildren();
   historyEmpty.hidden = items.length > 0;
+  historyEmpty.textContent = historyItems.length ? "No matching transcripts." : "No transcriptions yet.";
 
   for (const item of items) {
     const li = document.createElement("li");
 
-    const body = document.createElement("div");
-    const meta = document.createElement("p");
+    const body = document.createElement("button");
+    body.type = "button";
+    body.className = "history-entry";
+    const meta = document.createElement("span");
     meta.className = "muted small";
     meta.textContent = describe(item);
-    const text = document.createElement("p");
+    const text = document.createElement("span");
     text.className = "text";
     text.textContent = item.text || "(no speech detected)";
     body.append(meta, text);
-    body.style.cursor = "pointer";
-    body.addEventListener("click", () => showResult(item));
+    body.addEventListener("click", () => {
+      showResult(item);
+      resultCard.scrollIntoView({ block: "nearest" });
+    });
 
     const del = document.createElement("button");
     del.className = "btn btn-ghost btn-small";
